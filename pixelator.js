@@ -13,7 +13,9 @@ export class Pixyelator {
 
     ctx.drawImage(imgElement, 0, 0);
 
-    const displayCanvas = document.getElementById("myCanvas");
+    const displayCanvas = document.getElementById("displayCanvas");
+
+    const displayCtx = displayCanvas.getContext("2d");
 
     displayCanvas.width = width;
     displayCanvas.height = height;
@@ -45,14 +47,7 @@ export class Pixyelator {
 
     const numWorkers = navigator.hardwareConcurrency;
 
-    const secondCanvas = document.getElementById("secondCanvas");
-    const secondCtx = secondCanvas.getContext("2d");
-
-    secondCanvas.width = width;
-    secondCanvas.height = height;
-
     const processInnerPromise = (outerValue, outerDimension) => {
-
       const [sliceX, sliceY, sliceWidth, sliceHeight] = shouldAllocateByRows
         ? [0, outerDimension, width, outerValue]
         : [outerDimension, 0, outerValue, height];
@@ -89,7 +84,11 @@ export class Pixyelator {
 
     const processInner = (outerValue, outerDimension) => {
       processInnerPromise(outerValue, outerDimension).then((result) => {
-        secondCtx.drawImage(result, outerDimension, 0);
+        const [x, y] = shouldAllocateByRows
+          ? [0, outerDimension]
+          : [outerDimension, 0];
+
+        displayCtx.drawImage(result, x, y);
       });
     };
 

@@ -45,12 +45,9 @@ onmessage = (e) => {
   let innerDimension = 0;
 
   for (const innerValue of innerValues) {
-    const [x, y] = shouldAllocateByRows
-      ? [innerDimension, 0]
-      : [0, innerDimension];
-
-    const sectionWidth = shouldAllocateByRows ? innerValue : outerValue;
-    const sectionHeight = shouldAllocateByRows ? outerValue : innerValue;
+    const [x, y, sectionWidth, sectionHeight] = shouldAllocateByRows
+      ? [innerDimension, 0, innerValue, outerValue]
+      : [0, innerDimension, outerValue, innerValue];
 
     const imageData = ctx.getImageData(x, y, sectionWidth, sectionHeight);
 
