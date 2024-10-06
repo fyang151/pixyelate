@@ -68,11 +68,10 @@ export class Pixyelator {
 
           innerWorker.postMessage([
             imageSliceBitmap,
+            width,
+            height,
             outerValue,
-            outerDimension,
             innerValues,
-            individualSectionWidths,
-            individualSectionHeights,
             shouldAllocateByRows,
           ]);
 
@@ -90,7 +89,6 @@ export class Pixyelator {
 
     const processInner = (outerValue, outerDimension) => {
       processInnerPromise(outerValue, outerDimension).then((result) => {
-        console.log("result", result);
         secondCtx.drawImage(result, outerDimension, 0);
       });
     };
