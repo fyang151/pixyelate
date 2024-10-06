@@ -37,16 +37,6 @@ onmessage = (e) => {
     shouldAllocateByRows,
   ] = e.data;
 
-  // console.log(
-  //   imageBitmap,
-  //   outerValue,
-  //   outerDimension,
-  //   innerValues,
-  //   individualSectionWidths,
-  //   individualSectionHeights,
-  //   shouldAllocateByRows
-  // );
-
   const imageWidth = shouldAllocateByRows ? imageBitmap.width : outerValue;
   const imageHeight = shouldAllocateByRows ? outerValue : imageBitmap.height;
 
@@ -64,11 +54,9 @@ onmessage = (e) => {
   let innerDimension = 0;
 
   for (const innerValue of innerValues) {
-    const [imageX, imageY, x, y] = shouldAllocateByRows
-      ? [0, 0, innerDimension, 0]
-      : [0, 0, 0, innerDimension];
-    // const x = shouldAllocateByRows ? innerDimension : 0;
-    // const y = shouldAllocateByRows ? 0 : innerDimension;
+    const [x, y] = shouldAllocateByRows
+      ? [innerDimension, 0]
+      : [0, innerDimension];
 
     const sectionWidth = shouldAllocateByRows ? innerValue : outerValue;
     const sectionHeight = shouldAllocateByRows ? outerValue : innerValue;

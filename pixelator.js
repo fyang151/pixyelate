@@ -1,29 +1,5 @@
-export class Pixelator {
-  static pixelateFromElement = (imgElement, xPixels, yPixels) => {
-    const getSingleRGBA = (x, y, width, height) => {
-      return new Promise((resolve, reject) => {
-        const imageData = ctx.getImageData(x, y, width, height).data;
-
-        const worker = new Worker("worker.js");
-        worker.postMessage(imageData.buffer, [imageData.buffer]);
-        worker.onmessage = (e) => {
-          resolve(e.data);
-          worker.terminate();
-        };
-        worker.onerror = (err) => {
-          reject(err);
-          worker.terminate();
-        };
-      });
-    };
-
-    const processSingleRGBA = (x, y, width, height) => {
-      getSingleRGBA(x, y, width, height).then(([r, g, b, a]) => {
-        displayCtx.fillStyle = `rgba(${r}, ${g}, ${b}, ${a})`;
-        displayCtx.fillRect(x, y, width, height);
-      });
-    };
-
+export class Pixyelator {
+  static fromElement = (imgElement, xPixels, yPixels) => {
     const width = imgElement.naturalWidth;
     const height = imgElement.naturalHeight;
 
@@ -38,7 +14,6 @@ export class Pixelator {
     ctx.drawImage(imgElement, 0, 0);
 
     const displayCanvas = document.getElementById("myCanvas");
-    const displayCtx = displayCanvas.getContext("2d");
 
     displayCanvas.width = width;
     displayCanvas.height = height;
@@ -68,22 +43,7 @@ export class Pixelator {
       ]++;
     }
 
-    console.log("widths", individualSectionWidths);
-    console.log("heights", individualSectionHeights);
-
-    console.log(
-      "calculated width",
-      individualSectionWidths.reduce((acc, current) => acc + current)
-    );
-    console.log("actual width", width);
-    console.log(
-      "calculated height",
-      individualSectionHeights.reduce((acc, current) => acc + current)
-    );
-    console.log("actual height", height);
-
     const numWorkers = navigator.hardwareConcurrency;
-    console.log("numworkers", numWorkers);
 
     const secondCanvas = document.getElementById("secondCanvas");
     const secondCtx = secondCanvas.getContext("2d");
@@ -92,8 +52,6 @@ export class Pixelator {
     secondCanvas.height = height;
 
     const processInnerPromise = (outerValue, outerDimension) => {
-      // const sliceWidth = shouldAllocateByRows ? width : outerValue;
-      // const sliceHeight = shouldAllocateByRows ? outerValue : height;
 
       const [sliceX, sliceY, sliceWidth, sliceHeight] = shouldAllocateByRows
         ? [0, outerDimension, width, outerValue]
@@ -147,22 +105,8 @@ export class Pixelator {
       ? individualSectionWidths
       : individualSectionHeights;
 
-    // const sampleOuterValue = outerValues[0];
-    // processInner(sampleOuterValue);
-
     for (const outerValue of outerValues) {
       processInner(outerValue, outerDimension);
-
-      // let innerDimension = 0;
-
-      // for (const innerValue of innerValues) {
-      //   const [x, y, width, height] = shouldAllocateByRows
-      //     ? [innerDimension, outerDimension, innerValue, outerValue]
-      //     : [outerDimension, innerDimension, outerValue, innerValue];
-      //   processSingleRGBA(x, y, width, height);
-
-      //   innerDimension += innerValue;
-      // }
       outerDimension += outerValue;
     }
   };
