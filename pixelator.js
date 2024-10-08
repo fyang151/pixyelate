@@ -1,4 +1,4 @@
-export class Pixyelator {
+export class pixyelator {
   static fromElement = (imgElement, xPixels, yPixels) => {
     const width = imgElement.naturalWidth;
     const height = imgElement.naturalHeight;
@@ -45,7 +45,9 @@ export class Pixyelator {
       ]++;
     }
 
-    const numWorkers = navigator.hardwareConcurrency;
+    const maxWorkers = navigator.hardwareConcurrency;
+    let tasks = [];
+    let activeWorkers = 0;
 
     const processInnerPromise = (outerValue, outerDimension) => {
       const [sliceX, sliceY, sliceWidth, sliceHeight] = shouldAllocateByRows
@@ -73,10 +75,14 @@ export class Pixyelator {
           innerWorker.onmessage = (e) => {
             resolve(e.data);
             innerWorker.terminate();
+            activeWorkers--;
+            nextQueue();
           };
           innerWorker.onerror = (err) => {
             reject(err.data);
             innerWorker.terminate();
+            activeWorkers--;
+            nextQueue();
           };
         });
       });
@@ -92,7 +98,13 @@ export class Pixyelator {
       });
     };
 
-    let outerDimension = 0;
+    const nextQueue = () => {
+      if (tasks.length > 0 && activeWorkers < maxWorkers) {
+        activeWorkers++;
+        const [outerValue, outerDimension] = tasks.shift();
+        processInner(outerValue, outerDimension);
+      }
+    };
 
     const outerValues = shouldAllocateByRows
       ? individualSectionHeights
@@ -102,9 +114,15 @@ export class Pixyelator {
       ? individualSectionWidths
       : individualSectionHeights;
 
-    for (const outerValue of outerValues) {
-      processInner(outerValue, outerDimension);
+    let outerDimension = 0;
+
+    outerValues.forEach((outerValue) => {
+      tasks.push([outerValue, outerDimension]);
       outerDimension += outerValue;
-    }
+    });
+
+    tasks.forEach(([outerValue, outerDimension]) => {
+      nextQueue([outerValue, outerDimension]);
+    });
   };
 }
