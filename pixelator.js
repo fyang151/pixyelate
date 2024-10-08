@@ -3,6 +3,11 @@ export class pixyelator {
     const width = imgElement.naturalWidth;
     const height = imgElement.naturalHeight;
 
+    if (xPixels > width || yPixels > height) {
+      console.error("Number of pixels exceeds the dimensions of the image.");
+      return;
+    }
+
     const canvas = document.createElement("canvas");
     const ctx = canvas.getContext("2d", {
       willReadFrequently: true,
@@ -125,4 +130,7 @@ export class pixyelator {
       nextQueue([outerValue, outerDimension]);
     });
   };
+
+  
+
 }
