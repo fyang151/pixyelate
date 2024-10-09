@@ -1,7 +1,18 @@
-export class pixyelator {
+export class Pixyelator {
+  static fromBlob = (imgBlob, xPixels, yPixels) => {};
+
+  static fromFile = () => {};
+
+  static fromDataUrl = () => {};
+
+  static fromArrayBuffer = () => {};
+
   static fromElement = (imgElement, xPixels, yPixels) => {
     const width = imgElement.naturalWidth;
     const height = imgElement.naturalHeight;
+
+    console.log("width", width);
+    console.log("height", height);
 
     const canvas = document.createElement("canvas");
     const ctx = canvas.getContext("2d", {
@@ -47,9 +58,30 @@ export class pixyelator {
 
     const maxWorkers = navigator.hardwareConcurrency;
     let tasks = [];
+    let resolvedTasks = 0;
     let activeWorkers = 0;
 
-    const processInnerPromise = (outerValue, outerDimension) => {
+    const outerValues = shouldAllocateByRows
+      ? individualSectionHeights
+      : individualSectionWidths;
+
+    const innerValues = shouldAllocateByRows
+      ? individualSectionWidths
+      : individualSectionHeights;
+
+    let outerDimension = 0;
+
+    outerValues.forEach((outerValue) => {
+      tasks.push([outerValue, outerDimension]);
+      outerDimension += outerValue;
+    });
+
+    tasks.forEach(() => {
+      nextQueue();
+    });
+
+    function processInnerSlice(outerValue, outerDimension) {
+      console.log("processingInnerSlice", outerDimension);
       const [sliceX, sliceY, sliceWidth, sliceHeight] = shouldAllocateByRows
         ? [0, outerDimension, width, outerValue]
         : [outerDimension, 0, outerValue, height];
@@ -86,43 +118,23 @@ export class pixyelator {
           };
         });
       });
-    };
+    }
 
-    const processInner = (outerValue, outerDimension) => {
-      processInnerPromise(outerValue, outerDimension).then((result) => {
-        const [x, y] = shouldAllocateByRows
-          ? [0, outerDimension]
-          : [outerDimension, 0];
-
-        displayCtx.drawImage(result, x, y);
-      });
-    };
-
-    const nextQueue = () => {
+    function nextQueue() {
       if (tasks.length > 0 && activeWorkers < maxWorkers) {
         activeWorkers++;
         const [outerValue, outerDimension] = tasks.shift();
-        processInner(outerValue, outerDimension);
+        console.log("advancing queue", outerDimension);
+
+        return processInnerSlice(outerValue, outerDimension).then((result) => {
+          const [x, y] = shouldAllocateByRows
+            ? [0, outerDimension]
+            : [outerDimension, 0];
+
+          displayCtx.drawImage(result, x, y);
+          resolvedTasks++;
+        });
       }
-    };
-
-    const outerValues = shouldAllocateByRows
-      ? individualSectionHeights
-      : individualSectionWidths;
-
-    const innerValues = shouldAllocateByRows
-      ? individualSectionWidths
-      : individualSectionHeights;
-
-    let outerDimension = 0;
-
-    outerValues.forEach((outerValue) => {
-      tasks.push([outerValue, outerDimension]);
-      outerDimension += outerValue;
-    });
-
-    tasks.forEach(([outerValue, outerDimension]) => {
-      nextQueue([outerValue, outerDimension]);
-    });
+    }
   };
 }
