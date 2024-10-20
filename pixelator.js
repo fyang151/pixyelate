@@ -1,145 +1,226 @@
+function blobToImageElement(blob) {
+  const url = URL.createObjectURL(blob);
+  const img = document.createElement("img");
+  img.src = url;
+
+  return new Promise((resolve) => {
+    img.onload = () => resolve(img);
+  });
+}
+
+function dataUrlToImageElement(dataUrl) {
+  const img = new Image();
+  img.src = dataUrl;
+
+  return new Promise((resolve, reject) => {
+    img.onload = () => resolve(img);
+    img.onerror = (error) => reject(error);
+  });
+}
+
+function arrayBufferToImageElement(arrayBuffer) {
+  const blob = new Blob([arrayBuffer], { type: "image/png" });
+  blobToImageElement(blob);
+}
+
+function canvasToBlob(canvas) {
+  return new Promise((resolve, reject) => {
+    canvas.toBlob((blob) => {
+      if (blob) {
+        resolve(blob);
+      } else {
+        reject(new Error("Canvas to Blob conversion failed"));
+      }
+    }, "image/png");
+  });
+}
+
+function canvasToDataURL(canvas) {
+  return canvas.toDataURL("iamge/png");
+}
+
+async function canvasToArrayBuffer(canvas) {
+  const blob = await new Promise((resolve) => canvas.toBlob(resolve));
+  return blob.arrayBuffer();
+}
+
+function convertToImageElement(image, inputType) {
+  switch (true) {
+    case image instanceof HTMLImageElement:
+      console.log("converting from HTMLImageElement");
+      return image;
+    case image instanceof Blob:
+      console.log("converting from Blob");
+      return blobToImageElement(image);
+    case typeof image === "string" && image.startsWith("data:"):
+      console.log("converting from dataURL");
+      return dataUrlToImageElement(image);
+    case image instanceof ArrayBuffer:
+      console.log("converting from ArrayBuffer");
+      return arrayBufferToImageElement(image);
+    default:
+      return ImageType.UNKNOWN;
+  }
+}
+
+function convertToOutputType(canvas, OutputType) {
+  switch (OutputType) {
+    case "blob":
+      return canvasToBlob(canvas);
+    case "dataURL":
+      return canvasToDataURL(canvas);
+    case "arrayBuffer":
+      return canvasToArrayBuffer(canvas);
+    default:
+      return canvas;
+  }
+}
+
 export class Pixyelator {
-  static fromBlob = (imgBlob, xPixels, yPixels) => {};
+  static toElement(imgInput, xPixels, yPixels, OutputType, InputType) {
+    this.fromElement(imgInput, xPixels, yPixels);
+  }
 
-  static fromFile = () => {};
+  static async fromElement(imgInput, xPixels, yPixels, OutputType) {
+    const imgElement = await convertToImageElement(imgInput, "blah");
 
-  static fromDataUrl = () => {};
-
-  static fromArrayBuffer = () => {};
-
-  static fromElement = (imgElement, xPixels, yPixels) => {
     const width = imgElement.naturalWidth;
     const height = imgElement.naturalHeight;
 
-    if (xPixels > width || yPixels > height) {
-      console.error("Number of pixels exceeds the dimensions of the image.");
-      return;
-    }
-
-    const canvas = document.createElement("canvas");
-    const ctx = canvas.getContext("2d", {
-      willReadFrequently: true,
-    });
-
-    canvas.width = width;
-    canvas.height = height;
-
-    ctx.drawImage(imgElement, 0, 0);
-
-    const displayCanvas = document.getElementById("displayCanvas");
-
-    const displayCtx = displayCanvas.getContext("2d");
-
-    displayCanvas.width = width;
-    displayCanvas.height = height;
-
-    const shouldAllocateByRows = xPixels > yPixels;
-
-    const widthRemainderPixels = width % xPixels;
-    const heightRemainderPixels = height % yPixels;
-
-    let individualSectionWidths = Array.from({ length: xPixels }, () =>
-      Math.floor(width / xPixels)
+    const displayCanvas = await this._pixelateElement(
+      imgElement,
+      width,
+      height,
+      xPixels,
+      yPixels
     );
+    return convertToOutputType(displayCanvas, OutputType);
+  }
 
-    for (let i = 0; i < widthRemainderPixels; i++) {
-      individualSectionWidths[
-        Math.floor(i * (xPixels / widthRemainderPixels))
-      ]++;
-    }
+  static _pixelateElement(element, width, height, xPixels, yPixels) {
+    console.log(width, height);
 
-    let individualSectionHeights = Array.from({ length: yPixels }, () =>
-      Math.floor(height / yPixels)
-    );
+    return new Promise((resolve, reject) => {
+      if (xPixels > width || yPixels > height) {
+        console.error("Number of pixels exceeds the dimensions of the image.");
+        return;
+      }
 
-    for (let i = 0; i < heightRemainderPixels; i++) {
-      individualSectionHeights[
-        Math.floor(i * (yPixels / heightRemainderPixels))
-      ]++;
-    }
+      const displayCanvas = document.getElementById("displayCanvas");
 
-    const maxWorkers = navigator.hardwareConcurrency;
-    let tasks = [];
-    let resolvedTasks = 0;
-    let activeWorkers = 0;
+      const displayCtx = displayCanvas.getContext("2d");
 
-    const outerValues = shouldAllocateByRows
-      ? individualSectionHeights
-      : individualSectionWidths;
+      displayCanvas.width = width;
+      displayCanvas.height = height;
 
-    const innerValues = shouldAllocateByRows
-      ? individualSectionWidths
-      : individualSectionHeights;
+      const shouldAllocateByRows = xPixels > yPixels;
 
-    let outerDimension = 0;
+      const widthRemainderPixels = width % xPixels;
+      const heightRemainderPixels = height % yPixels;
 
-    outerValues.forEach((outerValue) => {
-      tasks.push([outerValue, outerDimension]);
-      outerDimension += outerValue;
-    });
+      let individualSectionWidths = Array.from({ length: xPixels }, () =>
+        Math.floor(width / xPixels)
+      );
 
-    tasks.forEach(() => {
-      nextQueue();
-    });
+      for (let i = 0; i < widthRemainderPixels; i++) {
+        individualSectionWidths[
+          Math.floor(i * (xPixels / widthRemainderPixels))
+        ]++;
+      }
 
-    function processInnerSlice(outerValue, outerDimension) {
-      console.log("processingInnerSlice", outerDimension);
-      const [sliceX, sliceY, sliceWidth, sliceHeight] = shouldAllocateByRows
-        ? [0, outerDimension, width, outerValue]
-        : [outerDimension, 0, outerValue, height];
-      return new Promise((resolve, reject) => {
-        createImageBitmap(
-          imgElement,
-          sliceX,
-          sliceY,
-          sliceWidth,
-          sliceHeight
-        ).then((imageSliceBitmap) => {
-          const innerWorker = new Worker("innerWorker.js");
+      let individualSectionHeights = Array.from({ length: yPixels }, () =>
+        Math.floor(height / yPixels)
+      );
 
-          innerWorker.postMessage([
-            imageSliceBitmap,
-            width,
-            height,
-            outerValue,
-            innerValues,
-            shouldAllocateByRows,
-          ]);
+      for (let i = 0; i < heightRemainderPixels; i++) {
+        individualSectionHeights[
+          Math.floor(i * (yPixels / heightRemainderPixels))
+        ]++;
+      }
 
-          innerWorker.onmessage = (e) => {
-            resolve(e.data);
-            innerWorker.terminate();
-            activeWorkers--;
-            nextQueue();
-          };
-          innerWorker.onerror = (err) => {
-            reject(err.data);
-            innerWorker.terminate();
-            activeWorkers--;
-            nextQueue();
-          };
-        });
+      const maxWorkers = navigator.hardwareConcurrency;
+      let tasks = [];
+      let resolvedTasks = 0;
+      let activeWorkers = 0;
+
+      const outerValues = shouldAllocateByRows
+        ? individualSectionHeights
+        : individualSectionWidths;
+
+      const innerValues = shouldAllocateByRows
+        ? individualSectionWidths
+        : individualSectionHeights;
+
+      let outerDimension = 0;
+
+      outerValues.forEach((outerValue) => {
+        tasks.push([outerValue, outerDimension]);
+        outerDimension += outerValue;
       });
-    }
 
-    function nextQueue() {
-      if (tasks.length > 0 && activeWorkers < maxWorkers) {
-        activeWorkers++;
-        const [outerValue, outerDimension] = tasks.shift();
-        console.log("advancing queue", outerDimension);
+      tasks.forEach(() => {
+        nextQueue();
+      });
 
-        return processInnerSlice(outerValue, outerDimension).then((result) => {
-          const [x, y] = shouldAllocateByRows
-            ? [0, outerDimension]
-            : [outerDimension, 0];
+      function processInnerSlice(outerValue, outerDimension) {
+        const [sliceX, sliceY, sliceWidth, sliceHeight] = shouldAllocateByRows
+          ? [0, outerDimension, width, outerValue]
+          : [outerDimension, 0, outerValue, height];
+        return new Promise((resolve, reject) => {
+          createImageBitmap(
+            element,
+            sliceX,
+            sliceY,
+            sliceWidth,
+            sliceHeight
+          ).then((imageSliceBitmap) => {
+            const innerWorker = new Worker("innerWorker.js");
 
-          displayCtx.drawImage(result, x, y);
-          resolvedTasks++;
+            innerWorker.postMessage([
+              imageSliceBitmap,
+              width,
+              height,
+              outerValue,
+              innerValues,
+              shouldAllocateByRows,
+            ]);
+
+            innerWorker.onmessage = (e) => {
+              resolve(e.data);
+              innerWorker.terminate();
+              activeWorkers--;
+              nextQueue();
+            };
+            innerWorker.onerror = (err) => {
+              reject(err.data);
+              innerWorker.terminate();
+              activeWorkers--;
+              nextQueue();
+            };
+          });
         });
       }
-    }
-  };
 
-  
+      function nextQueue() {
+        if (tasks.length > 0 && activeWorkers < maxWorkers) {
+          activeWorkers++;
+          const [outerValue, outerDimension] = tasks.shift();
 
+          return processInnerSlice(outerValue, outerDimension).then(
+            (result) => {
+              const [x, y] = shouldAllocateByRows
+                ? [0, outerDimension]
+                : [outerDimension, 0];
+
+              displayCtx.drawImage(result, x, y);
+              resolvedTasks++;
+              if (resolvedTasks === outerValues.length) {
+                resolve(displayCanvas);
+              }
+            }
+          );
+        }
+      }
+    });
+  }
 }
