@@ -77,11 +77,18 @@ function convertToOutputType(canvas, OutputType) {
 }
 
 export class Pixyelator {
-  static toElement(imgInput, xPixels, yPixels, OutputType, InputType) {
-    this.fromElement(imgInput, xPixels, yPixels);
+  static toElement(
+    imgInput,
+    xPixels,
+    yPixels,
+    OutputType,
+    InputType,
+    maxWorkers
+  ) {
+    this.fromElement(imgInput, xPixels, yPixels, maxWorkers);
   }
 
-  static async fromElement(imgInput, xPixels, yPixels, OutputType) {
+  static async fromElement(imgInput, xPixels, yPixels, OutputType, maxWorkers) {
     const imgElement = await convertToImageElement(imgInput, "blah");
 
     const width = imgElement.naturalWidth;
@@ -92,12 +99,20 @@ export class Pixyelator {
       width,
       height,
       xPixels,
-      yPixels
+      yPixels,
+      maxWorkers
     );
     return convertToOutputType(displayCanvas, OutputType);
   }
 
-  static _pixelateElement(element, width, height, xPixels, yPixels) {
+  static _pixelateElement(
+    element,
+    width,
+    height,
+    xPixels,
+    yPixels,
+    maxWorkers = null
+  ) {
     console.log(width, height);
 
     return new Promise((resolve, reject) => {
@@ -138,10 +153,17 @@ export class Pixyelator {
         ]++;
       }
 
-      const maxWorkers = navigator.hardwareConcurrency;
-      let tasks = [];
+      if (!maxWorkers) {
+        maxWorkers = navigator.hardwareConcurrency;
+        console.log('setting max workers to default', maxWorkers);
+      } else {
+        console.log('setting custom max workers', maxWorkers);
+      }
+      
+      const workerArray = [];
+
+      const tasks = [];
       let resolvedTasks = 0;
-      let activeWorkers = 0;
 
       const outerValues = shouldAllocateByRows
         ? individualSectionHeights
@@ -158,11 +180,17 @@ export class Pixyelator {
         outerDimension += outerValue;
       });
 
-      tasks.forEach(() => {
-        nextQueue();
-      });
+      const maxProcesses = Math.min(tasks.length, maxWorkers);
 
-      function processInnerSlice(outerValue, outerDimension) {
+      for (let i = 0; i < maxProcesses; i++) {
+        nextQueue();
+      }
+
+      function processInnerSlice(
+        outerValue,
+        outerDimension,
+        innerWorker = null
+      ) {
         const [sliceX, sliceY, sliceWidth, sliceHeight] = shouldAllocateByRows
           ? [0, outerDimension, width, outerValue]
           : [outerDimension, 0, outerValue, height];
@@ -174,7 +202,11 @@ export class Pixyelator {
             sliceWidth,
             sliceHeight
           ).then((imageSliceBitmap) => {
-            const innerWorker = new Worker("innerWorker.js");
+            if (!innerWorker) {
+              console.log("we have no worker passed in so we are making one");
+              innerWorker = new Worker("innerWorker.js");
+              workerArray.push(innerWorker);
+            }
 
             innerWorker.postMessage([
               imageSliceBitmap,
@@ -186,39 +218,39 @@ export class Pixyelator {
             ]);
 
             innerWorker.onmessage = (e) => {
+              console.log("finished");
               resolve(e.data);
-              innerWorker.terminate();
-              activeWorkers--;
-              nextQueue();
+              nextQueue(innerWorker);
             };
             innerWorker.onerror = (err) => {
               reject(err.data);
-              innerWorker.terminate();
-              activeWorkers--;
-              nextQueue();
+              nextQueue(innerWorker);
             };
           });
         });
       }
 
-      function nextQueue() {
-        if (tasks.length > 0 && activeWorkers < maxWorkers) {
-          activeWorkers++;
+      function nextQueue(innerWorker = null) {
+        if (tasks.length > 0) {
           const [outerValue, outerDimension] = tasks.shift();
 
-          return processInnerSlice(outerValue, outerDimension).then(
-            (result) => {
-              const [x, y] = shouldAllocateByRows
-                ? [0, outerDimension]
-                : [outerDimension, 0];
+          return processInnerSlice(
+            outerValue,
+            outerDimension,
+            innerWorker
+          ).then((result) => {
+            const [x, y] = shouldAllocateByRows
+              ? [0, outerDimension]
+              : [outerDimension, 0];
 
-              displayCtx.drawImage(result, x, y);
-              resolvedTasks++;
-              if (resolvedTasks === outerValues.length) {
-                resolve(displayCanvas);
-              }
+            displayCtx.drawImage(result, x, y);
+            resolvedTasks++;
+            if (resolvedTasks === outerValues.length) {
+              resolve(displayCanvas);
+              workerArray.forEach((worker) => worker.terminate());
+              console.log("workerArray", workerArray);
             }
-          );
+          });
         }
       }
     });
