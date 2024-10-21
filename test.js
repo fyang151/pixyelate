@@ -1,8 +1,10 @@
 import { Pixyelator } from "./pixelator.js";
 
 const imgElement = document.getElementById("myImage");
-const xPixels = 900;
-const yPixels = 900;
+const xPixels = 100;
+const yPixels = 100;
 
-const thing = await Pixyelator.fromElement(imgElement, xPixels, yPixels, 'dataURL', 900);
-// console.log("thing", thing);
+const thing = await Pixyelator.toArrayBuffer(imgElement, xPixels, yPixels);
+console.log("thing", thing);
+
+console.log("otherThing", await arrayBufferToDataURL(thing));

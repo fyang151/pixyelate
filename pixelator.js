@@ -39,27 +39,31 @@ function canvasToDataURL(canvas) {
   return canvas.toDataURL("iamge/png");
 }
 
-async function canvasToArrayBuffer(canvas) {
-  const blob = await new Promise((resolve) => canvas.toBlob(resolve));
-  return blob.arrayBuffer();
-}
+function canvasToArrayBuffer(canvas) {
+  return new Promise((resolve, reject) => {
+    canvas.toBlob((blob) => {
+      if (blob) {
+        resolve(blob.arrayBuffer());
+      } else {
+        reject(new Error("Canvas to Blob conversion failed"));
+      }
+    });
+  });
+};
 
-function convertToImageElement(image, inputType) {
+function convertToImageElement(image) {
   switch (true) {
     case image instanceof HTMLImageElement:
-      console.log("converting from HTMLImageElement");
       return image;
     case image instanceof Blob:
-      console.log("converting from Blob");
       return blobToImageElement(image);
     case typeof image === "string" && image.startsWith("data:"):
-      console.log("converting from dataURL");
       return dataUrlToImageElement(image);
     case image instanceof ArrayBuffer:
-      console.log("converting from ArrayBuffer");
       return arrayBufferToImageElement(image);
     default:
-      return ImageType.UNKNOWN;
+      console.error("Unsupported image type");
+      return;
   }
 }
 
@@ -77,19 +81,40 @@ function convertToOutputType(canvas, OutputType) {
 }
 
 export class Pixyelator {
-  static toElement(
+  static toElement(imgInput, xPixels, yPixels, OutputType, maxWorkers) {
+    return this.fromElement(imgInput, xPixels, yPixels, OutputType, maxWorkers);
+  }
+
+  static toBlob(imgInput, xPixels, yPixels, maxWorkers) {
+    return this.fromElement(imgInput, xPixels, yPixels, "blob", maxWorkers);
+  }
+
+  static toDataURL(imgInput, xPixels, yPixels, maxWorkers) {
+    return this.fromElement(imgInput, xPixels, yPixels, "dataURL", maxWorkers);
+  }
+
+  static toArrayBuffer(imgInput, xPixels, yPixels, maxWorkers) {
+    return this.fromElement(
+      imgInput,
+      xPixels,
+      yPixels,
+      "arrayBuffer",
+      maxWorkers
+    );
+  }
+
+  static async fromElement(
     imgInput,
     xPixels,
     yPixels,
     OutputType,
-    InputType,
-    maxWorkers
+    maxWorkers = null
   ) {
-    this.fromElement(imgInput, xPixels, yPixels, maxWorkers);
-  }
+    const imgElement = await convertToImageElement(imgInput);
 
-  static async fromElement(imgInput, xPixels, yPixels, OutputType, maxWorkers) {
-    const imgElement = await convertToImageElement(imgInput, "blah");
+    if (!imgElement) {
+      return;
+    }
 
     const width = imgElement.naturalWidth;
     const height = imgElement.naturalHeight;
@@ -111,18 +136,15 @@ export class Pixyelator {
     height,
     xPixels,
     yPixels,
-    maxWorkers = null
+    maxWorkers
   ) {
-    console.log(width, height);
-
-    return new Promise((resolve, reject) => {
+    return new Promise((resolve) => {
       if (xPixels > width || yPixels > height) {
         console.error("Number of pixels exceeds the dimensions of the image.");
         return;
       }
 
-      const displayCanvas = document.getElementById("displayCanvas");
-
+      const displayCanvas = document.createElement("canvas");
       const displayCtx = displayCanvas.getContext("2d");
 
       displayCanvas.width = width;
@@ -155,11 +177,8 @@ export class Pixyelator {
 
       if (!maxWorkers) {
         maxWorkers = navigator.hardwareConcurrency;
-        console.log('setting max workers to default', maxWorkers);
-      } else {
-        console.log('setting custom max workers', maxWorkers);
       }
-      
+
       const workerArray = [];
 
       const tasks = [];
@@ -203,7 +222,6 @@ export class Pixyelator {
             sliceHeight
           ).then((imageSliceBitmap) => {
             if (!innerWorker) {
-              console.log("we have no worker passed in so we are making one");
               innerWorker = new Worker("innerWorker.js");
               workerArray.push(innerWorker);
             }
@@ -218,7 +236,6 @@ export class Pixyelator {
             ]);
 
             innerWorker.onmessage = (e) => {
-              console.log("finished");
               resolve(e.data);
               nextQueue(innerWorker);
             };
@@ -234,23 +251,22 @@ export class Pixyelator {
         if (tasks.length > 0) {
           const [outerValue, outerDimension] = tasks.shift();
 
-          return processInnerSlice(
-            outerValue,
-            outerDimension,
-            innerWorker
-          ).then((result) => {
-            const [x, y] = shouldAllocateByRows
-              ? [0, outerDimension]
-              : [outerDimension, 0];
+          return processInnerSlice(outerValue, outerDimension, innerWorker)
+            .then((result) => {
+              const [x, y] = shouldAllocateByRows
+                ? [0, outerDimension]
+                : [outerDimension, 0];
 
-            displayCtx.drawImage(result, x, y);
-            resolvedTasks++;
-            if (resolvedTasks === outerValues.length) {
-              resolve(displayCanvas);
-              workerArray.forEach((worker) => worker.terminate());
-              console.log("workerArray", workerArray);
-            }
-          });
+              displayCtx.drawImage(result, x, y);
+              resolvedTasks++;
+              if (resolvedTasks === outerValues.length) {
+                resolve(displayCanvas);
+                workerArray.forEach((worker) => worker.terminate());
+              }
+            })
+            .catch((error) => {
+              reject(error);
+            });
         }
       }
     });
