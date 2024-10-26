@@ -3,18 +3,31 @@ function blobToImageElement(blob) {
   const img = document.createElement("img");
   img.src = url;
 
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
     img.onload = () => resolve(img);
+    img.onerror = () => reject(img);
   });
 }
 
-function dataUrlToImageElement(dataUrl) {
+function dataURLToImageElement(dataUrl) {
   const img = new Image();
   img.src = dataUrl;
 
   return new Promise((resolve, reject) => {
     img.onload = () => resolve(img);
     img.onerror = (error) => reject(error);
+  });
+}
+
+function imageUrlToImageElement(imageUrl) {
+  console.log("aight we are converting", imageUrl);
+  const img = new Image();
+  img.crossOrigin = "anonymous";
+  img.src = imageUrl;
+
+  return new Promise((resolve, reject) => {
+    img.onload = () => resolve(img);
+    img.onerror = () => reject(img);
   });
 }
 
@@ -36,7 +49,7 @@ function canvasToBlob(canvas) {
 }
 
 function canvasToDataURL(canvas) {
-  return canvas.toDataURL("iamge/png");
+  return canvas.toDataURL("image/png");
 }
 
 function canvasToArrayBuffer(canvas) {
@@ -49,7 +62,7 @@ function canvasToArrayBuffer(canvas) {
       }
     });
   });
-};
+}
 
 function convertToImageElement(image) {
   switch (true) {
@@ -58,7 +71,9 @@ function convertToImageElement(image) {
     case image instanceof Blob:
       return blobToImageElement(image);
     case typeof image === "string" && image.startsWith("data:"):
-      return dataUrlToImageElement(image);
+      return dataURLToImageElement(image);
+    case typeof image === "string":
+      return imageUrlToImageElement(image);
     case image instanceof ArrayBuffer:
       return arrayBufferToImageElement(image);
     default:
@@ -222,7 +237,9 @@ export class Pixyelator {
             sliceHeight
           ).then((imageSliceBitmap) => {
             if (!innerWorker) {
-              innerWorker = new Worker("innerWorker.js");
+              innerWorker = new Worker(
+                new URL("innerWorker.js", import.meta.url)
+              );
               workerArray.push(innerWorker);
             }
 
@@ -240,7 +257,7 @@ export class Pixyelator {
               nextQueue(innerWorker);
             };
             innerWorker.onerror = (err) => {
-              reject(err.data);
+              reject(err);
               nextQueue(innerWorker);
             };
           });
@@ -251,22 +268,22 @@ export class Pixyelator {
         if (tasks.length > 0) {
           const [outerValue, outerDimension] = tasks.shift();
 
-          return processInnerSlice(outerValue, outerDimension, innerWorker)
-            .then((result) => {
-              const [x, y] = shouldAllocateByRows
-                ? [0, outerDimension]
-                : [outerDimension, 0];
+          return processInnerSlice(
+            outerValue,
+            outerDimension,
+            innerWorker
+          ).then((result) => {
+            const [x, y] = shouldAllocateByRows
+              ? [0, outerDimension]
+              : [outerDimension, 0];
 
-              displayCtx.drawImage(result, x, y);
-              resolvedTasks++;
-              if (resolvedTasks === outerValues.length) {
-                resolve(displayCanvas);
-                workerArray.forEach((worker) => worker.terminate());
-              }
-            })
-            .catch((error) => {
-              reject(error);
-            });
+            displayCtx.drawImage(result, x, y);
+            resolvedTasks++;
+            if (resolvedTasks === outerValues.length) {
+              resolve(displayCanvas);
+              workerArray.forEach((worker) => worker.terminate());
+            }
+          });
         }
       }
     });
