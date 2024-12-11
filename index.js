@@ -20,7 +20,6 @@ function dataURLToImageElement(dataUrl) {
 }
 
 function imageUrlToImageElement(imageUrl) {
-  console.log("aight we are converting", imageUrl);
   const img = new Image();
   img.crossOrigin = "anonymous";
   img.src = imageUrl;
@@ -82,8 +81,8 @@ function convertToImageElement(image) {
   }
 }
 
-function convertToOutputType(canvas, OutputType) {
-  switch (OutputType) {
+function convertToOutputType(canvas, outputType) {
+  switch (outputType) {
     case "blob":
       return canvasToBlob(canvas);
     case "dataURL":
@@ -96,25 +95,70 @@ function convertToOutputType(canvas, OutputType) {
 }
 
 export class Pixyelator {
-  static toElement(imgInput, xPixels, yPixels, OutputType, maxWorkers) {
-    return this.fromElement(imgInput, xPixels, yPixels, OutputType, maxWorkers);
+  static toElement({
+    imgInput,
+    xPixels,
+    yPixels,
+    maxWorkers = null,
+    customCanvasId,
+  }) {
+    return this.fromElement(
+      imgInput,
+      xPixels,
+      yPixels,
+      maxWorkers,
+      customCanvasId
+    );
   }
 
-  static toBlob(imgInput, xPixels, yPixels, maxWorkers) {
-    return this.fromElement(imgInput, xPixels, yPixels, "blob", maxWorkers);
+  static toBlob({
+    imgInput,
+    xPixels,
+    yPixels,
+    maxWorkers = null,
+    customCanvasId,
+  }) {
+    return this.fromElement(
+      imgInput,
+      xPixels,
+      yPixels,
+      "blob",
+      maxWorkers,
+      customCanvasId
+    );
   }
 
-  static toDataURL(imgInput, xPixels, yPixels, maxWorkers) {
-    return this.fromElement(imgInput, xPixels, yPixels, "dataURL", maxWorkers);
+  static toDataURL({
+    imgInput,
+    xPixels,
+    yPixels,
+    maxWorkers = null,
+    customCanvasId
+  }) {
+    return this.fromElement(
+      imgInput,
+      xPixels,
+      yPixels,
+      "dataURL",
+      maxWorkers,
+      customCanvasId
+    );
   }
 
-  static toArrayBuffer(imgInput, xPixels, yPixels, maxWorkers) {
+  static toArrayBuffer({
+    imgInput,
+    xPixels,
+    yPixels,
+    maxWorkers = null,
+    customCanvasId
+  }) {
     return this.fromElement(
       imgInput,
       xPixels,
       yPixels,
       "arrayBuffer",
-      maxWorkers
+      maxWorkers,
+      customCanvasId
     );
   }
 
@@ -122,8 +166,9 @@ export class Pixyelator {
     imgInput,
     xPixels,
     yPixels,
-    OutputType,
-    maxWorkers = null
+    outputType,
+    maxWorkers = null,
+    customCanvasId
   ) {
     const imgElement = await convertToImageElement(imgInput);
 
@@ -140,9 +185,10 @@ export class Pixyelator {
       height,
       xPixels,
       yPixels,
-      maxWorkers
+      maxWorkers,
+      customCanvasId
     );
-    return convertToOutputType(displayCanvas, OutputType);
+    return convertToOutputType(displayCanvas, outputType);
   }
 
   static _pixelateElement(
@@ -151,7 +197,8 @@ export class Pixyelator {
     height,
     xPixels,
     yPixels,
-    maxWorkers
+    maxWorkers,
+    customCanvasId
   ) {
     return new Promise((resolve) => {
       if (xPixels > width || yPixels > height) {
@@ -159,7 +206,14 @@ export class Pixyelator {
         return;
       }
 
-      const displayCanvas = document.createElement("canvas");
+      let displayCanvas = "";
+
+      if (customCanvasId) {
+        displayCanvas = document.getElementById(customCanvasId);
+      } else {
+        displayCanvas = document.createElement("canvas");
+      }
+
       const displayCtx = displayCanvas.getContext("2d");
 
       displayCanvas.width = width;
