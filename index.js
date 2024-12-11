@@ -83,6 +83,10 @@ function convertToImageElement(image) {
 
 function convertToOutputType(canvas, outputType) {
   switch (outputType) {
+    case null:
+      return;
+    case "element":
+      return canvas;
     case "blob":
       return canvasToBlob(canvas);
     case "dataURL":
@@ -95,17 +99,34 @@ function convertToOutputType(canvas, outputType) {
 }
 
 export class Pixyelator {
+  static convert({
+    imgInput,
+    xPixels,
+    yPixels,
+    maxWorkers = null,
+    customCanvasId = null,
+  }) {
+    this.fromElement(
+      imgInput,
+      xPixels,
+      yPixels,
+      null,
+      maxWorkers,
+      customCanvasId
+    );
+  }
   static toElement({
     imgInput,
     xPixels,
     yPixels,
     maxWorkers = null,
-    customCanvasId,
+    customCanvasId = null,
   }) {
     return this.fromElement(
       imgInput,
       xPixels,
       yPixels,
+      "element",
       maxWorkers,
       customCanvasId
     );
@@ -116,7 +137,7 @@ export class Pixyelator {
     xPixels,
     yPixels,
     maxWorkers = null,
-    customCanvasId,
+    customCanvasId = null,
   }) {
     return this.fromElement(
       imgInput,
@@ -133,7 +154,7 @@ export class Pixyelator {
     xPixels,
     yPixels,
     maxWorkers = null,
-    customCanvasId
+    customCanvasId = null,
   }) {
     return this.fromElement(
       imgInput,
@@ -150,7 +171,7 @@ export class Pixyelator {
     xPixels,
     yPixels,
     maxWorkers = null,
-    customCanvasId
+    customCanvasId = null,
   }) {
     return this.fromElement(
       imgInput,
@@ -167,7 +188,7 @@ export class Pixyelator {
     xPixels,
     yPixels,
     outputType,
-    maxWorkers = null,
+    maxWorkers,
     customCanvasId
   ) {
     const imgElement = await convertToImageElement(imgInput);
