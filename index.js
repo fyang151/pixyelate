@@ -98,7 +98,20 @@ function convertToOutputType(canvas, outputType) {
   }
 }
 
+/**
+ * @typedef {Object} ConvertOptions
+ * @property {*} imgInput - The image input to convert.
+ * @property {number} xPixels - The width in pixels.
+ * @property {number} yPixels - The height in pixels.
+ * @property {number|null} [maxWorkers=null] - The maximum number of workers to use.
+ * @property {string|null} [customCanvasId=null] - The ID of the custom canvas to use.
+ */
+
 export class Pixyelator {
+  /**
+   * No Output
+   * @param {ConvertOptions} options - The options for conversion.
+   */
   static convert({
     imgInput,
     xPixels,
@@ -115,6 +128,10 @@ export class Pixyelator {
       customCanvasId
     );
   }
+
+  /**
+   * @param {ConvertOptions} options - The options for conversion.
+   */
   static toElement({
     imgInput,
     xPixels,
@@ -132,6 +149,9 @@ export class Pixyelator {
     );
   }
 
+  /**
+   * @param {ConvertOptions} options - The options for conversion.
+   */
   static toBlob({
     imgInput,
     xPixels,
@@ -149,6 +169,9 @@ export class Pixyelator {
     );
   }
 
+  /**
+   * @param {ConvertOptions} options - The options for conversion.
+   */
   static toDataURL({
     imgInput,
     xPixels,
@@ -166,6 +189,9 @@ export class Pixyelator {
     );
   }
 
+  /**
+   * @param {ConvertOptions} options - The options for conversion.
+   */
   static toArrayBuffer({
     imgInput,
     xPixels,
